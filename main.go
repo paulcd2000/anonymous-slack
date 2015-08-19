@@ -47,7 +47,7 @@ var (
 		"rhino", "sheep", "shrew", "skunk", "slow loris", "squirrel", "turtle", "walrus", "wolf", "wolverine", "wombat",
 	}
 	// Username must be first.
-	payloadExp = regexp.MustCompile(`([@#][^\s]+):?(.*)`)
+	payloadExp = regexp.MustCompile(`([@#][^\s]+)?:?(.*)`)
 )
 
 // readAnonymousMessage parses the username and re-routes
@@ -67,11 +67,27 @@ func readAnonymousMessage(r *http.Request) string {
 	}
 	msg := strings.TrimSpace(r.Form[keyText][0])
 	matches := payloadExp.FindStringSubmatch(msg)
+	if len(r.Form[keyChannelName]) == 0 {
+		return "Internal Error, no channel name."
+	}
+	if len(r.Form[keyChannelName][0]) == 0 {
+		return "Internal Error, empty channel name."
+	}
+
+	var user = fmt.Sprintf("#%s", r.Form[keyChannelName][0])
+
 	if matches == nil {
 		return "Failed; message should be like: /anon @ashwin hey what's up?"
+	} else if len(matches[1]) == 0 {
+		msg = strings.TrimSpace(matches[2])
+	} else {
+		user = matches[1]
+		msg = strings.TrimSpace(matches[2])
 	}
-	user := matches[1]
-	msg = strings.TrimSpace(matches[2])
+	if user == "#directmessage" {
+		return "Failed; anonymous messages sent from a direct message must manually specify a target."
+	}
+
 	err = sendAnonymousMessage(user, msg)
 	if err != nil {
 		return "Failed to send message."
